@@ -44,9 +44,17 @@
                 <td>${x.stopComplex}</td>
                 <td>${x.dateTime.substring(0, 5)}</td>
                 <td>${x.busNumber}</td>
+                 <td><button onClick=delete_async('${x.id}')>Удалить</button></td>
             `;
             table.append(tr);
         })
+    }
+
+    async function delete_async(id) {
+        var response = await fetch(`http://127.0.0.1:5274/shedule/${id}`, { method: "delete" })
+        if (response.ok) {
+            location.reload()
+        }
     }
 </script>
 <style>
