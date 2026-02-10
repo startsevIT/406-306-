@@ -1,3 +1,8 @@
+using Microsoft.AspNetCore.Mvc.RazorPages;
+using System.Collections.Generic;
+using System.Numerics;
+using Microsoft.AspNetCore.Identity;
+
 var builder = WebApplication.CreateBuilder();
 builder.Services.AddSwaggerGen();
 builder.Services.AddCors();
@@ -23,62 +28,115 @@ app.MapDelete(shedulePath + "/{id}", (Guid id)
 
 app.Run();
 
-record BusSheduleUpdateDTO(
-    string? StopComplex,
-    TimeOnly? DateTime,
-    string? BusNumber);
 
-
-class BusSheduleRepository
+public class AuthService(UserRepo repo)
 {
-    private List<BusShedule> Shedules = [ new BusShedule() 
-    { 
-        Id = Guid.NewGuid(),
-        BusNumber = "12",
-        StopComplex = "Веревочный",
-        DateTime = new TimeOnly(15,07,00)
-    }];
-    public void Create(BusShedule shedule)
+    public void Register(UserRegisterDTO dto)
     {
-        Shedules.Add(shedule);
+        if (TryIdentification(dto.Login, out User? user))
+            throw new Exception("Такой логин уже занят");
+
+        repo.Create(new User
+        {
+            Id = Guid.NewGuid(),
+            Login = dto.Login,
+            HashedPassword = HashPassword(dto.Password),
+            Email = dto.Email,
+            Phone = dto.Phone,
+            Age = dto.Age,
+        });
+    }
+    public string Login(UserLoginDTO dto)
+    {
+        if (!TryAuthetication(dto, out User? user))
+            throw new Exception("Неверные логин или пароль");
+
+        return GenerateToken(user);
+    }
+    public bool TryIdentification(string login, out User? user)
+    {
+        user = null;
+        try
+        {
+            user = repo.Read(login);
+        }
+        catch
+        {
+            return false;
+        }
+        return true;
+    }
+    public bool TryAuthetication(UserLoginDTO dto, out User? result)
+    {
+       result = null;
+       if(!TryIdentification(dto.Login, out User? user))
+            return false;
+
+       if(!VirifyPassword(dto.Password, user!.HashedPassword))
+            return false;
+
+       result = user;
+       return true;
     }
 
-    public List<BusShedule> Read()
+    public bool Authorization(string token)
     {
-        return Shedules;
+        throw new NotImplementedException();
     }
 
-    public void Update(Guid id, 
-        string? stopComplex,
-        TimeOnly? dateTime, 
-        string? busNumber)
+
+    private string HashPassword(string password)
     {
-        var item = Shedules.FirstOrDefault(s => s.Id == id);
-        if (item == null)
-            throw new Exception("Нет такого");
-        if(stopComplex != null)
-            item.StopComplex = stopComplex;
-        if (dateTime.HasValue)
-            item.DateTime = dateTime.Value;
-        if(busNumber != null)
-            item.BusNumber = busNumber;
+        var hasher = new PasswordHasher<User>();
+        return hasher.HashPassword(null, password);
     }
 
-    public void Delete(Guid id)
+    private bool VirifyPassword(string password, string hashedPassword)
     {
-        var item = Shedules.FirstOrDefault(s => s.Id == id);
-        if (item == null)
-            throw new Exception("Нет такого");
-        Shedules.Remove(item);
+        var hasher = new PasswordHasher<User>();
+
+        var result = hasher.VerifyHashedPassword(null, hashedPassword, password);
+        if (result == PasswordVerificationResult.Success)
+            return true;
+        return false;
+    }
+
+    private string GenerateToken(User? user)
+    {
+        throw new NotImplementedException();
     }
 }
-class BusShedule
+
+public class UserRepo()
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
-    public string StopComplex { get; set; }
-    public TimeOnly DateTime { get; set; }
-    public string BusNumber { get; set; }
+    private List<User> Users { get; set; }
+
+    public void Create(User user)
+    {
+        Users.Add(user);
+    }
+
+    public User Read(string login)
+    {
+        var result = Users.SingleOrDefault(x => x.Login == login);
+        if (result == null)
+            throw new Exception("Такой пользователь не найден");
+
+        return result;
+    }
 }
 
-//BusNumber автобус останавливается на
-//остановке StopComplex в DateTime.Time
+public record UserLoginDTO(string Login, string Password);
+public record UserRegisterDTO(string Login, string Password, string Email, string Phone, int Age);
+
+public class User
+{
+    public Guid Id { get; set; }
+    public string Login { get; set; }
+    public string HashedPassword { get; set; }
+    public string Email { get; set; }
+    public string Phone { get; set; }
+    public int Age { get; set; }
+}
+
+//Вахтомову - 2 пятерки
